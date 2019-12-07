@@ -7,7 +7,7 @@ use std::io::prelude::*;
 use std::ops::{Add, Sub, AddAssign};
 use std::result;
 
-use std::collections::{BTreeMap, HashSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 

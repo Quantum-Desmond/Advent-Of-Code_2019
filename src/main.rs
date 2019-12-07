@@ -1,8 +1,6 @@
-#[macro_use]
 extern crate lazy_static;
-
-extern crate regex;
 extern crate itertools;
+extern crate regex;
 
 use std::time::Instant;
 
