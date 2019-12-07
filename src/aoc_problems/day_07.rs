@@ -75,7 +75,8 @@ struct Amplifier {
     memory: Vec<i32>,
     first_input: i32,
     second_input: i32,
-    current_input: usize
+    current_input: usize,
+    pointer_idx: usize
 }
 
 impl Amplifier {
@@ -84,20 +85,27 @@ impl Amplifier {
             memory,
             first_input,
             second_input,
-            current_input: 1
+            current_input: 1,
+            pointer_idx: 0
         }
     }
 
     fn get_input(&mut self) -> Result<i32> {
         let return_value = match self.current_input {
-            1 => self.first_input,
+            1 => {
+                self.current_input += 1;
+                self.first_input
+            },
             2 => self.second_input,
             x => return err!("{}", format!("Cannot understand input number {}", x))
         };
 
-        self.current_input += 1;
 
         Ok(return_value)
+    }
+
+    fn set_input(&mut self, input: i32) {
+        self.second_input = input;
     }
 
     fn get_parameter(&self, parameter_form: Parameter, val: i32) -> i32 {
@@ -109,123 +117,122 @@ impl Amplifier {
         }
     }
 
-    fn run_program(&mut self) -> Result<i32> {
-        let mut pointer_idx = 0;
+    fn run_program(&mut self) -> Result<Option<i32>> {
         loop {
-            let current_instruction = Instruction::new(self.memory[pointer_idx] as usize)?;
+            let current_instruction = Instruction::new(self.memory[self.pointer_idx] as usize)?;
             match current_instruction.opcode {
                 1 => {
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
-                        self.memory[pointer_idx+1],
+                        self.memory[self.pointer_idx+1],
                     );
                     let input_2 = self.get_parameter(
                         current_instruction.parameters[1],
-                        self.memory[pointer_idx+2],
+                        self.memory[self.pointer_idx+2],
                     );
-                    let output_idx = self.memory[pointer_idx+3] as usize;
+                    let output_idx = self.memory[self.pointer_idx+3] as usize;
                     self.memory[output_idx] = input_1 + input_2;
 
-                    pointer_idx += 4;
+                    self.pointer_idx += 4;
                 },
                 2 => {
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
-                        self.memory[pointer_idx+1],
+                        self.memory[self.pointer_idx+1],
                     );
                     let input_2 = self.get_parameter(
                         current_instruction.parameters[1],
-                        self.memory[pointer_idx+2],
+                        self.memory[self.pointer_idx+2],
                     );
-                    let output_idx = self.memory[pointer_idx+3] as usize;
+                    let output_idx = self.memory[self.pointer_idx+3] as usize;
                     self.memory[output_idx] = input_1 * input_2;
 
-                    pointer_idx += 4;
+                    self.pointer_idx += 4;
                 },
                 3 => {
-                    let output_idx = self.memory[pointer_idx+1] as usize;
+                    let output_idx = self.memory[self.pointer_idx+1] as usize;
                     self.memory[output_idx] = self.get_input()?;
 
-                    pointer_idx += 2;
+                    self.pointer_idx += 2;
                 },
                 4 => {
-                    let output_idx = self.memory[pointer_idx+1] as usize;
+                    let output_idx = self.memory[self.pointer_idx+1] as usize;
+                    self.pointer_idx += 2;
 
-                    return Ok(self.memory[output_idx]);
+                    return Ok(Some(self.memory[output_idx]));
 
-                    // pointer_idx += 2;
                 },
                 5 => {
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
-                        self.memory[pointer_idx+1],
+                        self.memory[self.pointer_idx+1],
                     );
                     let input_2 = self.get_parameter(
                         current_instruction.parameters[1],
-                        self.memory[pointer_idx+2],
+                        self.memory[self.pointer_idx+2],
                     );
                     if input_1 != 0 {
-                        pointer_idx = input_2 as usize;
+                        self.pointer_idx = input_2 as usize;
                     } else {
-                        pointer_idx += 3;
+                        self.pointer_idx += 3;
                     }
                 },
                 6 => {
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
-                        self.memory[pointer_idx+1],
+                        self.memory[self.pointer_idx+1],
                     );
                     let input_2 = self.get_parameter(
                         current_instruction.parameters[1],
-                        self.memory[pointer_idx+2],
+                        self.memory[self.pointer_idx+2],
                     );
                     if input_1 == 0 {
-                        pointer_idx = input_2 as usize;
+                        self.pointer_idx = input_2 as usize;
                     } else {
-                        pointer_idx += 3;
+                        self.pointer_idx += 3;
                     }
                 },
                 7 => {
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
-                        self.memory[pointer_idx+1],
+                        self.memory[self.pointer_idx+1],
                     );
                     let input_2 = self.get_parameter(
                         current_instruction.parameters[1],
-                        self.memory[pointer_idx+2],
+                        self.memory[self.pointer_idx+2],
                     );
-                    let output_idx = self.memory[pointer_idx+3] as usize;
+                    let output_idx = self.memory[self.pointer_idx+3] as usize;
                     self.memory[output_idx] = if input_1 < input_2 {
                         1
                     } else {
                         0
                     };
 
-                    pointer_idx += 4;
+                    self.pointer_idx += 4;
                 },
                 8 => {
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
-                        self.memory[pointer_idx+1],
+                        self.memory[self.pointer_idx+1],
                     );
                     let input_2 = self.get_parameter(
                         current_instruction.parameters[1],
-                        self.memory[pointer_idx+2],
+                        self.memory[self.pointer_idx+2],
                     );
-                    let output_idx = self.memory[pointer_idx+3] as usize;
+                    let output_idx = self.memory[self.pointer_idx+3] as usize;
                     self.memory[output_idx] = if input_1 == input_2 {
                         1
                     } else {
                         0
                     };
 
-                    pointer_idx += 4;
+                    self.pointer_idx += 4;
                 },
                 99 => break,
                 x => return err!("{}", format!("Incorrect opcode: {}", x))
             }
         }
-        err!("Shouldn't get here!")
+        Ok(None)
     }
 }
 
@@ -278,12 +285,12 @@ fn _q1(memory: Vec<i32>) -> Result<usize> {
     let amp_count = 5;
     let permutations = get_permutations(amp_count);
 
-    let mut input: i32 = 0;
     let mut max_signal = 0;
     for permutation in permutations {
-        for phase_setting in permutation {
-            let mut amp = Amplifier::new(memory.clone(), phase_setting as i32, input);
-            input = amp.run_program()?;
+        let mut input: i32 = 0;
+        for phase_setting in &permutation {
+            let mut amp = Amplifier::new(memory.clone(), *phase_setting as i32, input);
+            input = amp.run_program()?.unwrap();
         }
 
         if input > max_signal {
@@ -306,8 +313,39 @@ pub fn q2(fname: String) -> usize {
     _q2(memory).unwrap()
 }
 
-fn _q2(_test_programs: Vec<i32>) -> Result<usize> {
-    unimplemented!();
+fn _q2(memory: Vec<i32>) -> Result<usize> {
+    let amp_count = 5;
+    let permutations = get_permutations(amp_count);
+
+    let mut max_signal = 0;
+    for permutation in permutations {
+        let mut amp_idx = 0;
+        let mut output_signal = 0;
+        let mut input: i32 = 0;
+        let mut amplifiers: Vec<Amplifier> = permutation.iter().map(|&n| {
+            Amplifier::new(memory.clone(), (n + 5) as i32, input)
+        }).collect();
+        loop {
+            let amp = &mut amplifiers[amp_idx];
+            amp.set_input(input);
+
+            if let Some(output_value) = amp.run_program()? {
+                input = output_value;
+            } else {
+                if output_signal > max_signal {
+                    max_signal = output_signal;
+                }
+                break;
+            }
+
+            if amp_idx == 4 {
+                output_signal = input;
+            }
+            amp_idx = (amp_idx + 1) % 5;
+        }
+    }
+
+    Ok(max_signal as usize)
 }
 
 #[cfg(test)]
@@ -350,6 +388,26 @@ mod tests {
         assert_eq!(
             perms.len(),
             120
+        );
+    }
+
+    #[test]
+    fn day07_q2_test1() {
+        let memory = "3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5".to_string();
+        let memory: Vec<i32> = memory.trim().split(',').map(|s| s.parse().unwrap()).collect();
+        assert_eq!(
+            _q2(memory).unwrap(),
+            139629729
+        );
+    }
+
+    #[test]
+    fn day07_q2_test2() {
+        let memory = "3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,-5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10".to_string();
+        let memory: Vec<i32> = memory.trim().split(',').map(|s| s.parse().unwrap()).collect();
+        assert_eq!(
+            _q2(memory).unwrap(),
+            18216
         );
     }
 }
