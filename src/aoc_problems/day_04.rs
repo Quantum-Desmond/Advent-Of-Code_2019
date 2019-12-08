@@ -1,4 +1,3 @@
-use std::cmp;
 use std::error::Error;
 use std::io;
 use std::io::prelude::*;

@@ -260,8 +260,3 @@ fn _q2(test_programs: Vec<String>) -> Result<usize> {
     }
     unimplemented!();
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-}
