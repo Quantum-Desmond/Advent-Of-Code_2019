@@ -122,8 +122,6 @@ impl Program {
                     self.memory.resize(idx+1, 0);
                 }
 
-                println!("Index being read = {}", idx);
-
                 self.memory[idx]
             }
         }
@@ -149,11 +147,6 @@ impl Program {
                 self.memory[idx] as usize
             },
             Relative => {
-                println!(
-                    "Changing output idx from {} to add relative base {}",
-                    self.memory[idx],
-                    self.relative_base
-                );
                 (self.memory[idx] + self.relative_base) as usize
             },
             _ => panic!("Should never be here")
@@ -164,15 +157,8 @@ impl Program {
         loop {
             let current_instruction = Instruction::new(self.memory[self.pointer_idx] as usize)?;
 
-            println!(
-                "Instruction being run ({}) is {:?}",
-                self.memory[self.pointer_idx] as usize,
-                current_instruction
-            );
-
             match current_instruction.opcode {
                 1 => {
-                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1..self.pointer_idx+4]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
@@ -190,7 +176,6 @@ impl Program {
                     self.pointer_idx += 4;
                 },
                 2 => {
-                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1..self.pointer_idx+4]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
@@ -204,24 +189,20 @@ impl Program {
                         current_instruction.parameters[2]
                     );
                     self.set_parameter(output_idx, input_1 * input_2)?;
-                    // println!("{} * {} set to position {}", input_1, input_2, output_idx);
 
                     self.pointer_idx += 4;
                 },
                 3 => {
-                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1]);
                     let output_idx = self.get_output_idx(
                         self.pointer_idx + 1,
                         current_instruction.parameters[0]
                     );
                     let input = self.get_input()?;
-                    println!("Adding input {} to m[{}]", input, output_idx);
                     self.set_parameter(output_idx, input)?;
 
                     self.pointer_idx += 2;
                 },
                 4 => {
-                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1]);
                     let output_val = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1]
@@ -233,7 +214,6 @@ impl Program {
                     return Ok(Some(output_val));
                 },
                 5 => {
-                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1..self.pointer_idx+3]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
@@ -242,16 +222,13 @@ impl Program {
                         current_instruction.parameters[1],
                         self.memory[self.pointer_idx+2],
                     );
-                    println!("Input 1 = {}, input 2 = {}", input_1, input_2);
                     if input_1 != 0 {
-                        println!("Jumping to pointer index {}", input_2);
                         self.pointer_idx = input_2 as usize;
                     } else {
                         self.pointer_idx += 3;
                     }
                 },
                 6 => {
-                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1..self.pointer_idx+3]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
@@ -261,14 +238,12 @@ impl Program {
                         self.memory[self.pointer_idx+2],
                     );
                     if input_1 == 0 {
-                        println!("Jumping to pointer index {}", input_2);
                         self.pointer_idx = input_2 as usize;
                     } else {
                         self.pointer_idx += 3;
                     }
                 },
                 7 => {
-                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1..self.pointer_idx+4]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
@@ -286,7 +261,6 @@ impl Program {
                     self.pointer_idx += 4;
                 },
                 8 => {
-                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1..self.pointer_idx+4]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
@@ -299,27 +273,22 @@ impl Program {
                         self.pointer_idx + 3,
                         current_instruction.parameters[2]
                     );
-                    println!("Setting m[{}] to {} == {}", output_idx, input_1, input_2);
                     self.set_parameter(output_idx, if input_1 == input_2 {1} else {0})?;
 
                     self.pointer_idx += 4;
                 },
                 9 => {
-                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
                     );
                     self.relative_base += input_1;
 
-                    println!("Relative base is now {}", self.relative_base);
-
                     self.pointer_idx += 2;
                 },
                 99 => break,
                 x => return err!("{}", format!("Incorrect opcode: {}", x))
             }
-            println!("----------------------");
         }
         Ok(None)
     }
