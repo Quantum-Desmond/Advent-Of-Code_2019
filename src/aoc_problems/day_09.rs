@@ -96,17 +96,7 @@ impl Program {
     }
 
     fn get_input(&mut self) -> Result<i64> {
-        let return_value = match self.current_input {
-            1 => {
-                self.current_input += 1;
-                self.first_input
-            },
-            2 => self.second_input,
-            x => return err!("{}", format!("Cannot understand input number {}", x))
-        };
-
-
-        Ok(return_value)
+        Ok(self.first_input)
     }
 
     fn set_input(&mut self, input: i64) {
@@ -132,6 +122,8 @@ impl Program {
                     self.memory.resize(idx+1, 0);
                 }
 
+                println!("Index being read = {}", idx);
+
                 self.memory[idx]
             }
         }
@@ -147,11 +139,40 @@ impl Program {
         Ok(())
     }
 
+    fn get_output_idx(&mut self, idx: usize, parameter_type: Parameter) -> usize {
+        use self::Parameter::*;
+        if self.memory.len() < idx+1 {
+            self.memory.resize(idx+1, 0);
+        }
+        match parameter_type {
+            Position => {
+                self.memory[idx] as usize
+            },
+            Relative => {
+                println!(
+                    "Changing output idx from {} to add relative base {}",
+                    self.memory[idx],
+                    self.relative_base
+                );
+                (self.memory[idx] + self.relative_base) as usize
+            },
+            _ => panic!("Should never be here")
+        }
+    }
+
     fn run_program(&mut self) -> Result<Option<i64>> {
         loop {
             let current_instruction = Instruction::new(self.memory[self.pointer_idx] as usize)?;
+
+            println!(
+                "Instruction being run ({}) is {:?}",
+                self.memory[self.pointer_idx] as usize,
+                current_instruction
+            );
+
             match current_instruction.opcode {
                 1 => {
+                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1..self.pointer_idx+4]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
@@ -160,12 +181,16 @@ impl Program {
                         current_instruction.parameters[1],
                         self.memory[self.pointer_idx+2],
                     );
-                    let output_idx = self.memory[self.pointer_idx+3] as usize;
+                    let output_idx = self.get_output_idx(
+                        self.pointer_idx + 3,
+                        current_instruction.parameters[2]
+                    );
                     self.set_parameter(output_idx, input_1 + input_2)?;
 
                     self.pointer_idx += 4;
                 },
                 2 => {
+                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1..self.pointer_idx+4]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
@@ -174,25 +199,41 @@ impl Program {
                         current_instruction.parameters[1],
                         self.memory[self.pointer_idx+2],
                     );
-                    let output_idx = self.memory[self.pointer_idx+3] as usize;
+                    let output_idx = self.get_output_idx(
+                        self.pointer_idx + 3,
+                        current_instruction.parameters[2]
+                    );
                     self.set_parameter(output_idx, input_1 * input_2)?;
+                    // println!("{} * {} set to position {}", input_1, input_2, output_idx);
 
                     self.pointer_idx += 4;
                 },
                 3 => {
-                    let output_idx = self.memory[self.pointer_idx+1] as usize;
+                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1]);
+                    let output_idx = self.get_output_idx(
+                        self.pointer_idx + 1,
+                        current_instruction.parameters[0]
+                    );
                     let input = self.get_input()?;
+                    println!("Adding input {} to m[{}]", input, output_idx);
                     self.set_parameter(output_idx, input)?;
 
                     self.pointer_idx += 2;
                 },
                 4 => {
-                    let output_idx = self.memory[self.pointer_idx+1];
+                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1]);
+                    let output_val = self.get_parameter(
+                        current_instruction.parameters[0],
+                        self.memory[self.pointer_idx+1]
+                    );
+
+                    // let output_idx = self.memory[self.pointer_idx+1];
                     self.pointer_idx += 2;
 
-                    return Ok(Some(self.get_parameter(Parameter::Immediate, output_idx)));
+                    return Ok(Some(output_val));
                 },
                 5 => {
+                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1..self.pointer_idx+3]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
@@ -201,13 +242,16 @@ impl Program {
                         current_instruction.parameters[1],
                         self.memory[self.pointer_idx+2],
                     );
+                    println!("Input 1 = {}, input 2 = {}", input_1, input_2);
                     if input_1 != 0 {
+                        println!("Jumping to pointer index {}", input_2);
                         self.pointer_idx = input_2 as usize;
                     } else {
                         self.pointer_idx += 3;
                     }
                 },
                 6 => {
+                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1..self.pointer_idx+3]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
@@ -217,12 +261,14 @@ impl Program {
                         self.memory[self.pointer_idx+2],
                     );
                     if input_1 == 0 {
+                        println!("Jumping to pointer index {}", input_2);
                         self.pointer_idx = input_2 as usize;
                     } else {
                         self.pointer_idx += 3;
                     }
                 },
                 7 => {
+                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1..self.pointer_idx+4]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
@@ -231,12 +277,16 @@ impl Program {
                         current_instruction.parameters[1],
                         self.memory[self.pointer_idx+2],
                     );
-                    let output_idx = self.memory[self.pointer_idx+3] as usize;
+                    let output_idx = self.get_output_idx(
+                        self.pointer_idx + 3,
+                        current_instruction.parameters[2]
+                    );
                     self.set_parameter(output_idx, if input_1 < input_2 {1} else {0})?;
 
                     self.pointer_idx += 4;
                 },
                 8 => {
+                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1..self.pointer_idx+4]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
@@ -245,60 +295,34 @@ impl Program {
                         current_instruction.parameters[1],
                         self.memory[self.pointer_idx+2],
                     );
-                    let output_idx = self.memory[self.pointer_idx+3] as usize;
+                    let output_idx = self.get_output_idx(
+                        self.pointer_idx + 3,
+                        current_instruction.parameters[2]
+                    );
+                    println!("Setting m[{}] to {} == {}", output_idx, input_1, input_2);
                     self.set_parameter(output_idx, if input_1 == input_2 {1} else {0})?;
 
                     self.pointer_idx += 4;
                 },
                 9 => {
+                    println!("Parameters = {:?}", &self.memory[self.pointer_idx+1]);
                     let input_1 = self.get_parameter(
                         current_instruction.parameters[0],
                         self.memory[self.pointer_idx+1],
                     );
                     self.relative_base += input_1;
 
+                    println!("Relative base is now {}", self.relative_base);
+
                     self.pointer_idx += 2;
                 },
                 99 => break,
                 x => return err!("{}", format!("Incorrect opcode: {}", x))
             }
+            println!("----------------------");
         }
         Ok(None)
     }
-}
-
-pub fn permutations(size: usize) -> Permutations {
-    Permutations { idxs: (0..size).collect(), swaps: vec![0; size], i: 0 }
-}
-
-pub struct Permutations {
-    idxs: Vec<usize>,
-    swaps: Vec<usize>,
-    i: usize,
-}
-
-impl Iterator for Permutations {
-    type Item = Vec<usize>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.i > 0 {
-            loop {
-                if self.i >= self.swaps.len() { return None; }
-                if self.swaps[self.i] < self.i { break; }
-                self.swaps[self.i] = 0;
-                self.i += 1;
-            }
-            self.idxs.swap(self.i, (self.i & 1) * self.swaps[self.i]);
-            self.swaps[self.i] += 1;
-        }
-        self.i = 1;
-        Some(self.idxs.clone())
-    }
-}
-
-fn get_permutations(size: usize) -> Vec<Vec<usize>> {
-    let perms = Permutations { idxs: (0..size).collect(), swaps: vec![0; size], i: 0 };
-    perms.collect::<Vec<_>>()
 }
 
 pub fn q1(fname: String) -> usize {
@@ -313,7 +337,7 @@ pub fn q1(fname: String) -> usize {
 }
 
 fn _q1(memory: Vec<i64>) -> Result<usize> {
-    let mut program = Program::new(memory, 1, 0);
+    let mut program = Program::new(memory, 1, 1);
     let mut last_output = 0;
     while let Some(result) = program.run_program()? {
         last_output = result;
@@ -323,7 +347,7 @@ fn _q1(memory: Vec<i64>) -> Result<usize> {
     Ok(last_output as usize)
 }
 
-pub fn q2(fname: String) -> usize {
+pub fn q2(fname: String) -> String {
     let mut f = File::open(fname).expect("File not found");
     let mut f_contents = String::new();
 
@@ -334,39 +358,17 @@ pub fn q2(fname: String) -> usize {
     _q2(memory).unwrap()
 }
 
-fn _q2(memory: Vec<i64>) -> Result<usize> {
-    let amp_count = 5;
-    let permutations = get_permutations(amp_count);
-
-    let mut max_signal = 0;
-    for permutation in permutations {
-        let mut amp_idx = 0;
-        let mut output_signal = 0;
-        let mut input: i64 = 0;
-        let mut Programs: Vec<Program> = permutation.iter().map(|&n| {
-            Program::new(memory.clone(), (n + 5) as i64, input)
-        }).collect();
-        loop {
-            let amp = &mut Programs[amp_idx];
-            amp.set_input(input);
-
-            if let Some(output_value) = amp.run_program()? {
-                input = output_value;
-            } else {
-                if output_signal > max_signal {
-                    max_signal = output_signal;
-                }
-                break;
-            }
-
-            if amp_idx == 4 {
-                output_signal = input;
-            }
-            amp_idx = (amp_idx + 1) % 5;
-        }
+fn _q2(memory: Vec<i64>) -> Result<String> {
+    let mut program = Program::new(memory, 2, 2);
+    let mut last_output = 0;
+    let mut output = vec![];
+    while let Some(result) = program.run_program()? {
+        output.push(result);
     }
 
-    Ok(max_signal as usize)
+    println!("Output = {:?}", output);
+
+    Ok(output.iter().map(|&n| n.to_string()).collect::<Vec<_>>().join(","))
 }
 
 #[cfg(test)]
@@ -393,10 +395,10 @@ mod tests {
             output.push(result);
         }
 
-        assert!(
-            output.iter().any(|n: &i64| (*n).to_string().chars().count() == 16)
-        )
-
+        if !output.iter().any(|n: &i64| (*n).to_string().chars().count() == 16) {
+            println!("Failure: no 16-digit number in result {:?}", output);
+            assert!(false);
+        }
     }
 
     #[test]
