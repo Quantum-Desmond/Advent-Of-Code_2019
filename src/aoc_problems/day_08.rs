@@ -7,7 +7,7 @@ use std::io::prelude::*;
 use std::ops::{Add, Sub, AddAssign};
 use std::result;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
@@ -230,7 +230,7 @@ fn _q1(mut pixels: Vec<u32>) -> Result<usize> {
         .0;
 
     println!("Layer with least zeroes = {}", zero_layer_min);
-    
+
     Ok(
         picture.layers[zero_layer_min].values().filter(|&&pixel| pixel == PixelType::White).count()
         * picture.layers[zero_layer_min].values().filter(|&&pixel| pixel == PixelType::Transparent).count()

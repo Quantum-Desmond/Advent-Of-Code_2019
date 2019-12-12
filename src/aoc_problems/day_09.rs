@@ -329,7 +329,6 @@ pub fn q2(fname: String) -> String {
 
 fn _q2(memory: Vec<i64>) -> Result<String> {
     let mut program = Program::new(memory, 2, 2);
-    let mut last_output = 0;
     let mut output = vec![];
     while let Some(result) = program.run_program()? {
         output.push(result);
