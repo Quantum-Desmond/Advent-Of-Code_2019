@@ -10,10 +10,6 @@ use regex::Regex;
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
-macro_rules! err {
-    ($($tt:tt)*) => { Err(Box::<dyn Error>::from(format!($($tt)*))) }
-}
-
 fn pause() {
     let mut stdin = io::stdin();
     let mut stdout = io::stdout();
