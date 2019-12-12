@@ -389,6 +389,16 @@ impl Colour {
     }
 }
 
+impl fmt::Display for Colour {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::Colour::*;
+        match self {
+            Black => write!(f, "."),
+            White => write!(f, "█"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Eq, Debug, PartialEq, Hash)]
 enum Direction {
     Up,
@@ -427,6 +437,38 @@ impl Direction {
             Left => Coordinate::new(-1, 0),
         }
     }
+}
+
+fn print_paint_grid(mut paint_grid: BTreeMap<Coordinate, Colour>) {
+    // fill in blanks
+    let mut coords: Vec<Coordinate> = paint_grid.keys().map(|&c| c.clone()).collect();
+    coords.sort();
+    let first_coord = coords.first().unwrap();
+    let last_coord = coords.last().unwrap();
+
+    println!("First coord is {}", first_coord);
+    println!("Last coord is {}", last_coord);
+
+    for y in first_coord.y .. last_coord.y+1 {
+        for x in first_coord.x .. last_coord.x+1 {
+            let coord = Coordinate::new(x, y);
+            if !paint_grid.contains_key(&coord) {
+                paint_grid.insert(coord, Colour::Black);
+            }
+        }
+    }
+
+    for y in first_coord.y .. last_coord.y+1 {
+        for x in first_coord.x .. last_coord.x+1 {
+            let coord = Coordinate::new(x, y);
+            print!("{}", paint_grid.get(&coord).unwrap_or(&Colour::Black));
+            // if !paint_grid.contains_key(&coord) {
+            //     paint_grid.insert(coord, Colour::Black);
+            // }
+        }
+        print!("{}", '\n');
+    }
+
 }
 
 pub fn q1(fname: String) -> usize {
@@ -488,5 +530,44 @@ pub fn q2(fname: String) -> String {
 }
 
 fn _q2(memory: Vec<i64>) -> Result<String> {
-    unimplemented!();
+    let mut program = Program::new(memory);
+    let mut paint_grid: BTreeMap<Coordinate, Colour> = BTreeMap::new();
+    let mut current_coord: Coordinate = Coordinate::new(0, 0);
+    let mut current_orientation: Direction = Direction::Up;
+
+    // Starts on a white square instead
+    paint_grid.insert(current_coord, Colour::White);
+
+    loop {
+        program.set_input(
+            paint_grid.get(&current_coord)
+                .map(|colour| colour.to_digit())
+                .unwrap_or(0)
+        );
+
+        // First output: what colour to paint current square
+        if let Some(output) = program.run_program()? {
+            paint_grid.insert(current_coord, Colour::new(output)?);
+        } else { break; }
+
+        // Second output: which direction to move
+        if let Some(output) = program.run_program()? {
+            match output {
+                0 => {
+                    current_orientation = current_orientation.turn_left();
+                },
+                1 => {
+                    current_orientation = current_orientation.turn_right();
+                },
+                x => return err!("Invalid direction output from program: {}", x)
+            }
+
+            current_coord += current_orientation.unit_step();
+        } else { break; }
+    }
+
+    // fill in blanks with black squares
+    print_paint_grid(paint_grid);
+
+    Ok("".to_string())
 }
