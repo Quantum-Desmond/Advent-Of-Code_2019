@@ -39,3 +39,6 @@ pub mod day_13;
 
 #[allow(dead_code)]
 pub mod day_14;
+
+#[allow(dead_code)]
+pub mod day_15;

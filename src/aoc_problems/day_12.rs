@@ -8,8 +8,6 @@ use std::ops::{Add, Sub, AddAssign};
 use std::result;
 use std::str::FromStr;
 
-use std::collections::BTreeMap;
-
 use regex::Regex;
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
