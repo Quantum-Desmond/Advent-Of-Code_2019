@@ -3,12 +3,18 @@ use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::result;
+use std::thread;
+use std::time;
 
 use std::collections::{HashMap, HashSet};
 
 use regex::Regex;
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
+
+macro_rules! err {
+    ($($tt:tt)*) => { Err(Box::<dyn Error>::from(format!($($tt)*))) }
+}
 
 fn pause() {
     let mut stdin = io::stdin();
@@ -26,7 +32,8 @@ struct Orbits {
     orbit_count: HashMap<String, usize>,
     orbit_map: HashMap<String, HashSet<String>>,
     full_orbit_graph: HashMap<String, HashSet<String>>,
-    visited_nodes: HashSet<String>
+    visited_nodes: HashSet<String>,
+    dist_map: HashMap<String, usize>
 }
 
 impl Orbits {
@@ -63,7 +70,8 @@ impl Orbits {
             orbit_map,
             orbit_count: HashMap::new(),
             full_orbit_graph,
-            visited_nodes: HashSet::new()
+            visited_nodes: HashSet::new(),
+            dist_map: HashMap::new(),
         })
     }
 
@@ -101,7 +109,10 @@ impl Orbits {
         Ok(parent.clone())
     }
 
-    fn __dfs(&mut self, v: &String, path: &Vec<String>, target: &String) -> Result<()> {
+    fn __dfs(&mut self, v: &String, dist: usize, target: &String) -> Option<usize> {
+        if v == target {
+            return Some(self.dist_map[&target.clone()]);
+        }
         self.visited_nodes.insert(v.clone());
 
         let edges: Vec<String> = self.full_orbit_graph.get(v)
@@ -112,27 +123,36 @@ impl Orbits {
 
         for edge in edges {
             if !self.visited_nodes.contains(&edge) {
-                let mut new_path = path.clone();
-                new_path.push(edge.clone());
-                if edge == *target {
-                    println!("{:?}", new_path);
-                    println!("{}", new_path.len());
+                let new_dist = 1 + dist;
+                if !self.dist_map.contains_key(&edge) || new_dist < self.dist_map[&edge] {
+                    self.dist_map.insert(edge.clone(), new_dist);
                 }
-                self.__dfs(v, &new_path, &target)?;
+
+                if edge == *target {
+                    println!("{:?}", self.dist_map);
+                    return Some(self.dist_map[&target.clone()]);
+                }
+                if let Some(dist) = self.__dfs(&edge, new_dist, &target) {
+                    return Some(dist);
+                }
             }
         }
 
-        Ok(())
+        None
     }
 
     fn shortest_path_from(&mut self, source: String, target: String) -> Result<usize> {
         let source_parent = self.parent_of(&source)?;
         let target_parent = self.parent_of(&target)?;
 
-        let path: Vec<String> = vec![];
-        self.__dfs(&source_parent, &path, &target_parent)?;
+        println!("Parent of YOU = {}", source_parent);
+        println!("Parent of SAN = {}", target_parent);
 
-        unimplemented!();
+        let result = self.__dfs(&source_parent, 0, &target_parent);
+
+        println!("Result = {:?}", result);
+
+        Ok(result.unwrap())
     }
 }
 
@@ -169,8 +189,8 @@ pub fn q2(fname: String) -> usize {
 
 fn _q2(orbits: Vec<String>) -> Result<usize> {
     let mut orbit_info = Orbits::new(orbits)?;
-    let orbit_count = orbit_info.shortest_path_from("YOU".to_string(), "SAN".to_string())?;
-    unimplemented!();
+
+    orbit_info.shortest_path_from("YOU".to_string(), "SAN".to_string())
 }
 
 #[cfg(test)]
@@ -201,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn day06_q2_tests() {
+    fn day06_q2_test() {
         let orbits_str: Vec<String> = "
             COM)B
             B)C
