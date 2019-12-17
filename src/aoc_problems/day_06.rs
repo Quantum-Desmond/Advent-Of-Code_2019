@@ -3,8 +3,6 @@ use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::result;
-use std::thread;
-use std::time;
 
 use std::collections::{HashMap, HashSet};
 
@@ -12,9 +10,6 @@ use regex::Regex;
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
-macro_rules! err {
-    ($($tt:tt)*) => { Err(Box::<dyn Error>::from(format!($($tt)*))) }
-}
 
 fn pause() {
     let mut stdin = io::stdin();
