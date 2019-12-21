@@ -371,10 +371,6 @@ enum SquareType {
     System
 }
 
-impl fmt::Display for SquareType {
-    fn
-}
-
 #[derive(Clone, Copy, Eq, Debug, PartialEq, Hash)]
 enum Direction {
     Up,
