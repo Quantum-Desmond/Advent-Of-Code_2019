@@ -46,6 +46,22 @@ impl Signal {
 
         Ok(())
     }
+
+    fn shorter_fft_iterate(&mut self, target: usize) -> Result<()> {
+        let mut current_idx = self.numbers.len() - 1;
+
+        let mut result = 0;
+        while current_idx >= target {
+            result += self.numbers[current_idx];
+            result = result % 10;
+
+            self.numbers[current_idx] = result;
+
+            current_idx -= 1;
+        }
+
+        Ok(())
+    }
 }
 
 fn fft_pattern(step: usize, size: usize) -> Vec<i32> {
@@ -116,10 +132,13 @@ fn _q2(number_list: Vec<i32>) -> Result<String> {
         extended_list.extend(&number_list);
     }
 
+    println!("Length of number list = {}", extended_list.len());
+    println!("Fraction through list = {}", (offset as f32 / extended_list.len() as f32));
+
     let mut signal = Signal::new(extended_list);
 
     for iteration in 0..100 {
-        signal.fft_iterate()?;
+        signal.shorter_fft_iterate(offset)?;
         println!("Completed {} iterations", iteration);
     }
 
