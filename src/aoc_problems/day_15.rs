@@ -7,7 +7,7 @@ use std::io::prelude::*;
 use std::ops::{Add, Sub, AddAssign};
 use std::result;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
@@ -36,6 +36,15 @@ struct Coordinate {
 impl Coordinate {
     fn new(x: i32, y: i32) -> Coordinate {
         Coordinate { x, y }
+    }
+
+    fn neighbours(&self) -> Vec<Coordinate> {
+        vec![
+            Coordinate::new(self.x, self.y + 1),
+            Coordinate::new(self.x - 1, self.y),
+            Coordinate::new(self.x + 1, self.y),
+            Coordinate::new(self.x, self.y - 1)
+        ]
     }
 }
 
@@ -166,7 +175,7 @@ impl Program {
     }
 
     fn get_input(&mut self) -> Result<i64> {
-        Ok(self.current_input as i64)
+        Ok(self.input as i64)
     }
 
     fn set_input(&mut self, input: i64) {
@@ -371,6 +380,17 @@ enum SquareType {
     System
 }
 
+impl fmt::Display for SquareType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::SquareType::*;
+        match &self {
+            Wall => write!(f, "#"),
+            Open => write!(f, "."),
+            System => write!(f, "x"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Eq, Debug, PartialEq, Hash)]
 enum Direction {
     Up,
@@ -400,28 +420,239 @@ impl Direction {
             Right => 4
         }
     }
+
+    fn to_coordinate(&self) -> Coordinate {
+        use self::Direction::*;
+        match self {
+            Up    => Coordinate { x: 0 , y: 1  },
+            Down  => Coordinate { x: 0 , y: -1 },
+            Left  => Coordinate { x: -1, y: 0  },
+            Right => Coordinate { x: 1 , y: 0  },
+        }
+    }
 }
 
 struct Droid {
     program: Program,
-    floor_map: BTreeMap<Coordinate, SquareType>
+    floor_map: BTreeMap<Coordinate, SquareType>,
+    leak_location: Coordinate,
+    current_coord: Coordinate,
 }
 
 impl Droid {
     fn new(memory: Vec<i64>) -> Droid {
         Droid {
             program: Program::new(memory),
-            floor_map: BTreeMap::new()
+            floor_map: BTreeMap::new(),
+            leak_location: Coordinate::new(0, 0),
+            current_coord: Coordinate::new(0, 0)
         }
     }
 
-    fn find_leak(&mut self) -> Result<()> {
-        let mut current_coord = Coordinate::new(0, 0);
+    fn shortest_path_from_to(&self, from: Coordinate, to: Coordinate) -> Result<Vec<Coordinate>> {
+        let mut d = BTreeMap::new();
+        d.insert(from, 0);
 
+        let mut queue: VecDeque<Coordinate> = VecDeque::new();
+        queue.push_front(from);
+        let mut todo_set: BTreeSet<Coordinate> = BTreeSet::new();
+        let mut visited: BTreeSet<Coordinate> = BTreeSet::new();
+        while let Some(c) = queue.pop_front() {
+            todo_set.remove(&c);
+            visited.insert(c);
 
+            if c == to {
+                break;
+            }
+
+            for neighbour in c.neighbours().into_iter().filter(|coord| self.floor_map.get(&coord) == Some(&SquareType::Open)) {
+                if visited.contains(&neighbour) {
+                    continue;
+                }
+                if !todo_set.contains(&neighbour) {
+                    queue.push_back(neighbour);
+                    todo_set.insert(neighbour);
+                }
+
+                let new_dist = 1 + *d.get(&c).unwrap_or(&0);
+                if !d.contains_key(&neighbour) || new_dist < d[&neighbour] {
+                    d.insert(neighbour, new_dist);
+                }
+            }
+        }
+
+        let mut path_to_take: Vec<Coordinate> = vec![to];
+        let mut current_position = to;
+        loop {
+            let next_position = current_position.neighbours().into_iter().filter(|&c| d.contains_key(&c)).min_by_key(|&c| d[&c]);
+            if next_position.is_none() {
+                println!("{}", self);
+                return err!("Cannot find any neighbours for {}", current_position);
+            }
+
+            let next_position = next_position.unwrap();
+            path_to_take.push(next_position);
+            if next_position == from {
+                break;
+            }
+            current_position = next_position;
+        }
+
+        path_to_take.reverse();
+        Ok(path_to_take)
+    }
+
+    fn steps_to_get_to(&self, coord: Coordinate) -> Result<usize> {
+        let path = self.shortest_path_from_to(Coordinate::new(0, 0), coord)?;
+
+        Ok(path.len() - 1)
+    }
+
+    fn dist_to_leak(&self) -> Result<usize> {
+        self.steps_to_get_to(self.leak_location)
+    }
+
+    fn find_leak(&mut self, stop_on_leak: bool) -> Result<()> {
+        self.floor_map.insert(self.current_coord, SquareType::Open);
+
+        let mut current_target = Coordinate::new(0, 0);
+
+        // set input to chosen direction
+        // run program
+        // figure out what to do based on output values
+        'main: loop {
+            if self.floor_map.contains_key(&current_target) {
+                let next_potential_target = self.floor_map.iter()
+                    .filter(|(_, &square)| square == SquareType::Open)
+                    .flat_map(|(&coord, _)| coord.neighbours())
+                    .filter(|&coord| !self.floor_map.contains_key(&coord))
+                    .next();
+                if let Some(c) = next_potential_target {
+                    current_target = c;
+                } else {
+                    return Ok(());
+                }
+            }
+
+            // println!("Current target = {:?}", current_target);
+
+            let path_to_next_target = self.shortest_path_from_to(self.current_coord, current_target)?;
+
+            // println!("Path from {} to {} = {:?}", self.current_coord, current_target, path_to_next_target);
+
+            let directions = convert_path_to_directions(path_to_next_target)?;
+
+            for direction in directions {
+                // println!("Inputting {:?} ({}) into program", direction, direction.to_digit());
+                self.program.set_input(direction.to_digit());
+                if let Some(result) = self.program.run_program()? {
+                    match result {
+                        0 => {
+                            // hit a wall
+                            // println!("{} is a wall, droid doesn't move", self.current_coord + direction.to_coordinate());
+                            self.floor_map.insert(self.current_coord + direction.to_coordinate(), SquareType::Wall);
+                            continue 'main;
+                        },
+                        1 => {
+                            // all is well
+                            // println!("{} is clear, droid moves", self.current_coord + direction.to_coordinate());
+                            self.floor_map.insert(self.current_coord + direction.to_coordinate(), SquareType::Open);
+                            self.current_coord += direction.to_coordinate();
+                        },
+                        2 => {
+                            // moved and found leak!
+                            println!("Found leak at {}!", self.current_coord + direction.to_coordinate());
+                            // println!("{}", self);
+                            self.floor_map.insert(self.current_coord + direction.to_coordinate(), SquareType::System);
+                            self.leak_location = self.current_coord + direction.to_coordinate();
+                            self.current_coord += direction.to_coordinate();
+                            if stop_on_leak {
+                                break 'main;
+                            }
+                        },
+                        x => panic!("Unexpected output from program: {}", x)
+                    }
+                }
+            }
+        }
 
         Ok(())
     }
+
+    fn time_for_oxygen_spread(&mut self) -> Result<usize> {
+        let mut oxygen_squares: BTreeSet<Coordinate> = BTreeSet::new();
+        oxygen_squares.insert(self.leak_location);
+
+        let mut t = 0;
+
+        loop {
+            let near_oxygen_squares: Vec<_> = oxygen_squares.iter()
+                .flat_map(|&coord| coord.neighbours())
+                .filter(|&coord| self.floor_map[&coord] == SquareType::Open && !oxygen_squares.contains(&coord)).collect();
+
+            if near_oxygen_squares.is_empty() {
+                break;
+            }
+
+            oxygen_squares.extend(near_oxygen_squares.iter());
+
+            t += 1;
+        }
+
+        Ok(t)
+    }
+}
+
+impl fmt::Display for Droid {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let first_x = self.floor_map.keys().map(|&c| c.x).min().unwrap();
+        let last_x = self.floor_map.keys().map(|&c| c.x).max().unwrap();
+        let first_y = self.floor_map.keys().map(|&c| c.y).min().unwrap();
+        let last_y = self.floor_map.keys().map(|&c| c.y).max().unwrap();
+
+        for y in (first_y..=last_y).rev() {
+            for x in first_x..=last_x {
+                let coord = Coordinate::new(x, y);
+                if coord == self.current_coord {
+                    write!(f, "D")?;
+                    continue;
+                }
+
+                if coord == Coordinate::new(0, 0) {
+                    write!(f, "O")?;
+                    continue;
+                }
+
+                match self.floor_map.get(&coord) {
+                    Some(square_type) => {
+                        write!(f, "{}", square_type)?;
+                    },
+                    None => {
+                        write!(f, " ")?;
+                    }
+                }
+            }
+            write!(f, "{}", '\n')?;
+        }
+
+        Ok(())
+    }
+}
+
+fn convert_path_to_directions(path: Vec<Coordinate>) -> Result<Vec<Direction>> {
+    path.windows(2).map(|t| {
+        use self::Direction::*;
+
+        let coord_difference = t[1] - t[0];
+
+        match (coord_difference.x, coord_difference.y) {
+            (1, 0) => Ok(Right),
+            (-1, 0) => Ok(Left),
+            (0, 1) => Ok(Up),
+            (0, -1) => Ok(Down),
+            (x, y) => err!("{}", format!("Invalid difference: {}, {}", x, y))
+        }
+    }).collect()
 }
 
 
@@ -438,8 +669,8 @@ pub fn q1(fname: String) -> usize {
 
 fn _q1(memory: Vec<i64>) -> Result<usize> {
     let mut droid = Droid::new(memory);
-    droid.find_leak()?;
-    unimplemented!();
+    droid.find_leak(true)?;
+    droid.dist_to_leak()
 }
 
 pub fn q2(fname: String) -> usize {
@@ -453,6 +684,13 @@ pub fn q2(fname: String) -> usize {
     _q2(memory).unwrap()
 }
 
-fn _q2(mut memory: Vec<i64>) -> Result<usize> {
-    unimplemented!();
+fn _q2(memory: Vec<i64>) -> Result<usize> {
+    let mut droid = Droid::new(memory);
+
+    droid.find_leak(false)?;
+
+    // Map has been completely filled in
+    println!("{}", droid);
+
+    droid.time_for_oxygen_spread()
 }
