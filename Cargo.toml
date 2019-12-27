@@ -6,6 +6,7 @@ authors = ["Karl McCarron <karl.mccarron@eggplant.io>"]
 [dependencies]
 itertools = "0.8.1"
 permutate = "0.3.2"
+petgraph = "0.5.0"
 lazy_static = "1.4.0"
 regex = "1"
 chrono = "0.4"
