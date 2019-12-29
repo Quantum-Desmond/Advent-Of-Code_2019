@@ -9,9 +9,15 @@ use std::result;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
-use itertools::Itertools;
-
 type Result<T> = result::Result<T, Box<dyn Error>>;
+
+type GraphEdge = (usize, HashSet<TileType>);
+
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+enum GraphNode {
+    Start(Coordinate),
+    Key(TileType)
+}
 
 macro_rules! err {
     ($($tt:tt)*) => { Err(Box::<dyn Error>::from(format!($($tt)*))) }
@@ -151,7 +157,9 @@ impl fmt::Display for TileType {
 struct Vault {
     floor_map: BTreeMap<Coordinate, TileType>,
     current_location: Coordinate,
-    key_locations: HashMap<TileType, Coordinate>
+    key_locations: HashMap<TileType, Coordinate>,
+    dists: HashMap<(GraphNode, GraphNode), (usize, HashSet<TileType>)>,
+    reachable_keys: HashMap<GraphNode, Vec<TileType>>
 }
 
 impl Vault {
@@ -179,7 +187,9 @@ impl Vault {
             Vault {
                 floor_map,
                 current_location,
-                key_locations
+                key_locations,
+                dists: HashMap::new(),
+                reachable_keys: HashMap::new()
             }
         )
     }
@@ -279,16 +289,128 @@ impl Vault {
         d[&to]
     }
 
+    fn keys_reachable_from(&self, pt: Coordinate) -> Result<Vec<TileType>> {
+        let mut queue: VecDeque<Coordinate> = VecDeque::new();
+        queue.push_front(pt);
+
+        let mut todo_set: BTreeSet<Coordinate> = BTreeSet::new();
+        let mut visited: BTreeSet<Coordinate> = BTreeSet::new();
+
+        let mut keys: Vec<TileType> = vec![];
+
+        while let Some(c) = queue.pop_front() {
+            todo_set.remove(&c);
+            visited.insert(c);
+
+            for neighbour in c.adjacent_squares().into_iter().filter(|coord| self.floor_map.get(&coord) != Some(&TileType::Wall)) {
+                // Don't add to squares to do
+                if visited.contains(&neighbour) {
+                    continue;
+                }
+
+                // don't walk past a key, as that's the end of the line
+                if let Some(TileType::Key(c)) = self.floor_map.get(&neighbour) {
+                    keys.push(TileType::Key(*c));
+                    continue;
+                }
+
+                if !todo_set.contains(&neighbour) {
+                    queue.push_back(neighbour);
+                    todo_set.insert(neighbour);
+                }
+            }
+        }
+
+        Ok(keys)
+    }
+
+    fn graph_edge_for(&self, from: Coordinate, to: Coordinate) -> (usize, HashSet<TileType>) {
+        let mut d = BTreeMap::new();
+        d.insert(from, 0);
+
+        let mut queue: VecDeque<Coordinate> = VecDeque::new();
+        queue.push_front(from);
+
+        let mut todo_set: BTreeSet<Coordinate> = BTreeSet::new();
+        let mut visited: BTreeSet<Coordinate> = BTreeSet::new();
+
+        while let Some(c) = queue.pop_front() {
+            todo_set.remove(&c);
+            visited.insert(c);
+
+            if c == to {
+                break;
+            }
+
+            for neighbour in c.adjacent_squares().into_iter().filter(|coord| self.floor_map.get(&coord) != Some(&TileType::Wall)) {
+                // Don't add to squares to do
+                if visited.contains(&neighbour) {
+                    continue;
+                }
+
+                if let Some(TileType::Key(_c)) = self.floor_map.get(&neighbour) {
+                    continue;
+                }
+
+                if !todo_set.contains(&neighbour) {
+                    queue.push_back(neighbour);
+                    todo_set.insert(neighbour);
+                }
+
+                let new_dist = 1 + *d.get(&c).unwrap_or(&0);
+                if !d.contains_key(&neighbour) || new_dist < d[&neighbour] {
+                    d.insert(neighbour, new_dist);
+                }
+            }
+        }
+
+        let mut current_coordinate = to;
+        let mut doors: HashSet<TileType> = HashSet::new();
+        loop {
+            let previous_coord = current_coordinate
+                .adjacent_squares()
+                .into_iter()
+                .filter(|coord| d.contains_key(coord))
+                .min_by_key(|coord| d[coord]).unwrap();
+
+            if previous_coord == from {
+                break;
+            }
+
+            if let Some(TileType::Door(c)) = self.floor_map.get(&previous_coord) {
+                doors.insert(TileType::Key(*c));
+            }
+            current_coordinate = previous_coord;
+        }
+
+        (d[&to], doors)
+    }
+
     fn generate_key_graph(&mut self) -> Result<()> {
         // first, add path from start to all reachable keys
         // then path from each key to all others
-        let mut preconditions: HashMap<(TileType, TileType), HashSet<TileType>> = HashMap::new();
 
-        for (key, &coord) in self.key_locations.iter() {
-            let (dist, doors_in_way) = self.path_from_to(self.current_location, coord);
-            
+        // first, add everything reachable from the starting point
+        let keys_from_start = self.keys_reachable_from(self.current_location)?;
+        for key in &keys_from_start {
+            self.dists.insert(
+                (GraphNode::Start(self.current_location), GraphNode::Key(*key)),
+                self.graph_edge_for(self.current_location, self.key_locations[&key])
+            );
         }
+        self.reachable_keys.insert(GraphNode::Start(self.current_location), keys_from_start);
 
+        for (key, key_coordinate) in self.key_locations.iter() {
+            let possible_targets = self.keys_reachable_from(*key_coordinate)?;
+            for next_key in &possible_targets {
+                self.dists.insert(
+                    (GraphNode::Key(*key), GraphNode::Key(*next_key)),
+                    self.graph_edge_for(*key_coordinate, self.key_locations[next_key])
+                );
+            }
+
+            self.reachable_keys.insert(GraphNode::Key(*key), possible_targets);
+        }
 
         Ok(())
     }
@@ -389,6 +511,8 @@ fn _q1(chars: Vec<Vec<char>>) -> Result<usize> {
 
     vault.generate_key_graph()?;
 
+    let mut current_path: Vec<GraphNode> = vec![];
+
     let mut potential_key_orderings: Vec<Vec<TileType>> = vec![vec![]];
     loop {
         let mut new_keys = false;
@@ -433,7 +557,7 @@ pub fn q2(fname: String) -> usize {
     _q2(map_lines).unwrap()
 }
 
-fn _q2(chars: Vec<Vec<char>>) -> Result<usize> {
+fn _q2(_chars: Vec<Vec<char>>) -> Result<usize> {
     unimplemented!();
 }
 
