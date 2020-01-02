@@ -7,7 +7,7 @@ use std::io::prelude::*;
 use std::ops::{Add, Sub, AddAssign};
 use std::result;
 
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 

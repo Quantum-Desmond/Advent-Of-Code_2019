@@ -7,15 +7,7 @@ use std::io::prelude::*;
 use std::ops::{Add, Sub, AddAssign};
 use std::result;
 
-use std::collections::{BTreeMap, VecDeque};
-
-use itertools::Itertools;
-
 type Result<T> = result::Result<T, Box<dyn Error>>;
-
-macro_rules! err {
-    ($($tt:tt)*) => { Err(Box::<dyn Error>::from(format!($($tt)*))) }
-}
 
 fn pause() {
     let mut stdin = io::stdin();
@@ -124,7 +116,7 @@ pub fn q1(fname: String) -> usize {
     _q1(map_char_list).unwrap()
 }
 
-fn _q1(chars: Vec<Vec<char>>) -> Result<usize> {
+fn _q1(_chars: Vec<Vec<char>>) -> Result<usize> {
     unimplemented!();
 }
 
@@ -139,7 +131,7 @@ pub fn q2(fname: String) -> usize {
     _q2(map_char_list).unwrap()
 }
 
-fn _q2(chars: Vec<Vec<char>>) -> Result<usize> {
+fn _q2(_chars: Vec<Vec<char>>) -> Result<usize> {
     unimplemented!();
 }
 

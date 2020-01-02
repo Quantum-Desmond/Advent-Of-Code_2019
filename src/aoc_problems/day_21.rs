@@ -4,7 +4,7 @@ use std::io;
 use std::io::prelude::*;
 use std::result;
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::VecDeque;
 
 use itertools::Itertools;
 
@@ -312,10 +312,15 @@ pub fn q1(fname: String) -> usize {
 fn _q1(memory: Vec<i64>) -> Result<usize> {
     let mut program = Program::new(memory);
 
+    // ground = true
+    // hole = false
     let instructions: Vec<String> = vec![
-        "NOT A J".into(),
-        "WALK".into()
-    ];
+        "NOT A J",
+        "NOT C T",
+        "AND D T",
+        "OR T J",
+        "WALK"
+    ].into_iter().map(|s| s.to_string()).collect_vec();
 
     for instruction in instructions {
         for char in instruction.chars() {
@@ -347,6 +352,7 @@ pub fn q2(fname: String) -> usize {
 }
 
 fn _q2(memory: Vec<i64>) -> Result<usize> {
+    let _x = memory;
     unimplemented!();
 }
 

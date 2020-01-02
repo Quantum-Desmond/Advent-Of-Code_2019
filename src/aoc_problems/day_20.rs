@@ -183,7 +183,6 @@ impl PlutoMaze {
                             let mut letter_coords = vec![first_letter_coord, second_letter_coord];
                             letter_coords.sort();
 
-                            let char_tuple = (chars[letter_coords[0].y][letter_coords[0].x], chars[letter_coords[1].y][letter_coords[1].x]);
                             if is_outside_portal {
                                 outside_portals.insert(Coordinate::new(x, y));
                             } else {
@@ -309,40 +308,6 @@ impl PlutoMaze {
         };
 
         Ok(neighbours)
-        // let neighbours: Vec<Coordinate> = match self.tile_map.get(&coord).ok_or(format!("Cannot find {} in tile map", coord))? {
-        //     TileType::Open => {
-        //         coord.neighbours()
-        //             .into_iter()
-        //             .filter(|coord| {
-        //                 if recursive {
-
-        //                 } else {
-        //                     self.tile_map.get(&coord) != Some(&TileType::Wall) && self.tile_map.get(&coord) != Some(&TileType::Blank)
-        //                 }
-        //             })
-        //             .collect()
-        //     },
-        //     TileType::Portal(char_tuple) => {
-        //         let mut neighbours: Vec<_> = coord.neighbours()
-        //             .into_iter()
-        //             .filter(|coord| self.tile_map.get(&coord) != Some(&TileType::Wall) && self.tile_map.get(&coord) != Some(&TileType::Blank))
-        //             .collect();
-        //         if *char_tuple != ('A', 'A') && *char_tuple != ('Z', 'Z') {
-        //             let other_portal_coord: Coordinate = self.portal_map.get(&TileType::Portal(*char_tuple))
-        //                 .ok_or(format!("Cannot find portal for {:?}", char_tuple))?
-        //                 .iter()
-        //                 .filter(|&&cc| cc != coord)
-        //                 .next()
-        //                 .ok_or(format!("Cannot find other portal coordinate for {}", coord))?
-        //                 .clone();
-        //             neighbours.push(other_portal_coord);
-        //         }
-        //         neighbours
-        //     },
-        //     tile_type => return err!("Cannot find neighbours of type {:?}", tile_type),
-        // };
-
-        // Ok(neighbours)
     }
 
     fn find_path_through_maze(&mut self, recursive: bool) -> Result<()> {

@@ -511,8 +511,6 @@ fn _q1(chars: Vec<Vec<char>>) -> Result<usize> {
 
     vault.generate_key_graph()?;
 
-    let mut current_path: Vec<GraphNode> = vec![];
-
     let mut potential_key_orderings: Vec<Vec<TileType>> = vec![vec![]];
     loop {
         let mut new_keys = false;
