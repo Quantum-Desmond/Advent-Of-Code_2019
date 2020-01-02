@@ -333,11 +333,11 @@ fn _q1(memory: Vec<i64>) -> Result<usize> {
         if result <= 255 {
             print!("{}", result as u8 as char);
         } else {
-            print!("{}", result);
+            return Ok(result as usize);
         }
     }
 
-    unimplemented!();
+    err!("Program ended without correct value")
 }
 
 pub fn q2(fname: String) -> usize {
@@ -352,7 +352,33 @@ pub fn q2(fname: String) -> usize {
 }
 
 fn _q2(memory: Vec<i64>) -> Result<usize> {
-    let _x = memory;
-    unimplemented!();
+    let mut program = Program::new(memory);
+
+    // ground = true
+    // hole = false
+    let instructions: Vec<String> = vec![
+        "NOT A J",
+        "NOT C T",
+        "AND D T",
+        "OR T J",
+        "RUN"
+    ].into_iter().map(|s| s.to_string()).collect_vec();
+
+    for instruction in instructions {
+        for char in instruction.chars() {
+            program.add_input(char as u8 as i64);
+        }
+        program.add_input('\n' as u8 as i64);
+    }
+
+    while let Some(result) = program.run_program()? {
+        if result <= 255 {
+            print!("{}", result as u8 as char);
+        } else {
+            return Ok(result as usize);
+        }
+    }
+
+    err!("Program ended without correct value")
 }
 
